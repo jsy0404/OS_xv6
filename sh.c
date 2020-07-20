@@ -1,4 +1,5 @@
 // Shell.
+
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
@@ -145,6 +146,7 @@ main(void)
 {
   static char buf[100];
   int fd;
+
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
     if(fd >= 3){

@@ -21,7 +21,7 @@ main(void)
 
   for(;;){
     printf(1, "init: starting sh\n");
-    printf(1, "ID: 201424489\nName: JunSeok.Yang\n");
+    printf(1,"ID: 201424489\nName: JunSeok.Yang\n");
     pid = fork();
     if(pid < 0){
       printf(1, "init: fork failed\n");
@@ -32,7 +32,7 @@ main(void)
       printf(1, "init: exec sh failed\n");
       exit();
     }
-    while((wpid=wait()) >= 0 && wpid != pid)
-      printf(1, "zombie!\n");
+    while((wpid=wait()) >= 0 && wpid != pid);
+      //printf(1, "zombie!\n");
   }
 }

@@ -183,7 +183,6 @@ void
 inituvm(pde_t *pgdir, char *init, uint sz)
 {
   char *mem;
-
   if(sz >= PGSIZE)
     panic("inituvm: more than a page");
   mem = kalloc();

@@ -97,7 +97,6 @@ mpinit(void)
   struct mpconf *conf;
   struct mpproc *proc;
   struct mpioapic *ioapic;
-
   if((conf = mpconfig(&mp)) == 0)
     panic("Expect to run on an SMP");
   ismp = 1;

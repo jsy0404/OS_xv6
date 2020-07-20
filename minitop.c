@@ -2,8 +2,8 @@
 #include "stat.h"
 #include "user.h"
 
-int main(void){
-
-    printf(1,"%d\n", getreadcount());
+int main(int argv, char** argc){
+    ps(0);
     exit();
+    return 0;
 }

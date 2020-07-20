@@ -182,6 +182,12 @@ UPROGS=\
 	_wc\
 	_zombie\
     _getreadcount\
+    _minitop\
+    _test1\
+    _test2\
+    _test3\
+    _test4\
+    _test5\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -192,7 +198,7 @@ clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*.o *.d *.asm *.sym vectors.S bootblock entryother \
 	initcode initcode.out kernel xv6.img fs.img kernelmemfs \
-	xv6memfs.img mkfs .gdbinit \
+	xv6memfs.img mkfs .gdbinit cscope.out \
 	$(UPROGS)
 
 # make a printout
@@ -218,7 +224,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 2
+CPUS := 1
 endif
 QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
 
@@ -250,7 +256,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
-	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
+	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c getreadcount minitop.c test1.c test2.c test3.c test4.c test5.c\
 	printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
@@ -285,3 +291,11 @@ tar:
 	(cd /tmp; tar cf - xv6) | gzip >xv6-rev10.tar.gz  # the next one will be 10 (9/17)
 
 .PHONY: dist-test dist
+
+PROJECTNUM=2
+
+# DO NOT EDIT
+tarball:
+	make clean
+	tar --exclude='.git' -cvzf ../xv6-pnu-p$(PROJECTNUM).tar.gz ../xv6-pnu-p$(PROJECTNUM)
+

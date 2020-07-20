@@ -25,6 +25,9 @@ int sleep(int);
 int uptime(void);
 int halt(void) __attribute__((noreturn));
 int freemem(void);
+int get_refcounter(int);
+int dec_refcounter(int);
+int inc_refcounter(int);
 
 // ulib.c
 int stat(char*, struct stat*);

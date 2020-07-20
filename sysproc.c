@@ -6,7 +6,6 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
-
 int
 sys_fork(void)
 {
@@ -99,4 +98,34 @@ sys_halt(void)
 
 int sys_freemem(void){
    return freemem();
+}
+
+int
+sys_get_refcounter(void)
+{
+  int pa;
+  if(argint(0, &pa) < 0)
+      return -1;
+  get_refcounter((uint)pa);
+  return 0;
+}
+
+int
+sys_dec_refcounter(void)
+{
+  int pa;
+  if(argint(0, &pa) < 0)
+      return -1;
+  dec_refcounter((uint)pa);
+  return 0;
+}
+
+int
+sys_inc_refcounter(void)
+{
+  int pa;
+  if(argint(0, &pa) < 0)
+    return -1;
+  inc_refcounter((uint)pa);
+  return 0;
 }

@@ -63,10 +63,8 @@ runcmd(struct cmd *cmd)
   struct listcmd *lcmd;
   struct pipecmd *pcmd;
   struct redircmd *rcmd;
-
   if(cmd == 0)
     exit();
-
   switch(cmd->type){
   default:
     panic("runcmd");
@@ -146,7 +144,6 @@ main(void)
 {
   static char buf[100];
   int fd;
-
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
     if(fd >= 3){
@@ -166,6 +163,7 @@ main(void)
     }
     if(fork1() == 0)
       runcmd(parsecmd(buf));
+    //printf(1,"");
     wait();
   }
   exit();

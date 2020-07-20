@@ -1,5 +1,5 @@
 // Physical memory allocator, intended to allocate
-// memory for user processes, kernel stacks, page table pages,
+// memory for user processes, kernel stacks, pgae table pages,
 // and pipe buffers. Allocates 4096-byte pages.
 
 #include "types.h"
@@ -13,7 +13,7 @@ void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
                    // defined by the kernel linker script in kernel.ld
 int numfreepages = 0;
-
+uint pgrefcount[PHYSTOP >> PGSHIFT];
 struct run {
   struct run *next;
 };
@@ -49,8 +49,10 @@ freerange(void *vstart, void *vend)
 {
   char *p;
   p = (char*)PGROUNDUP((uint)vstart);
-  for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)vend; p += PGSIZE){
+    pgrefcount[V2P(p)>>PGSHIFT]=1;
     kfree(p);
+  }
 }
 //PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
@@ -61,21 +63,23 @@ void
 kfree(char *v)
 {
   struct run *r;
-
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
-
+  dec_refcounter(V2P(v));
   // Fill with junk to catch dangling refs.
-  memset(v, 1, PGSIZE);
-
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
-  numfreepages++;
-  r = (struct run*)v;
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  if(kmem.use_lock)
-    release(&kmem.lock);
+  if(get_refcounter(V2P(v))<1){
+    memset(v, 1, PGSIZE);
+    pgrefcount[V2P(v)>>PGSHIFT] = 0; 
+    if(kmem.use_lock)
+        acquire(&kmem.lock);
+    numfreepages++;
+    r = (struct run*)v;
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+  
+    if(kmem.use_lock)
+        release(&kmem.lock);
+  }
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -85,11 +89,11 @@ char*
 kalloc(void)
 {
   struct run *r;
-
   if(kmem.use_lock)
     acquire(&kmem.lock);
   numfreepages--;
   r = kmem.freelist;
+  pgrefcount[V2P((uint)r)>>PGSHIFT]=1;
   if(r)
     kmem.freelist = r->next;
   if(kmem.use_lock)
@@ -101,3 +105,14 @@ int freemem(){
   return numfreepages;
 }
 
+uint get_refcounter(uint pa){
+    return pgrefcount[pa>>PGSHIFT];
+}
+
+void dec_refcounter(uint pa){
+    --pgrefcount[pa>>PGSHIFT];
+}
+
+void inc_refcounter(uint pa){
+    ++pgrefcount[pa>>PGSHIFT];
+}

@@ -1,27 +1,29 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
-#include "memlayout.h"
 
-int main(int argc, char *argv[]){
+int
+main(int argc, char **argv)
+{
+	int before, after;
 	int pid;
 
-	printf(1, "[Test1, try invalid access]\n");
-
-	printf(1, "================================== Result=================================\n");
+	printf(1, "TEST1: ");
+	
+	before = freemem();
 
 	pid = fork();
-	
 	if(pid == 0){
-		*(char *)(KERNBASE + 50000) += 10;
-		//printf(2, "test: %c\n", *(char *)(100));
-		//int x[4];
-		//x[4] = 8;
+		after = freemem();
+		if(before - after == 68)
+			printf(1, "OK\n");
+		else
+			printf(1, "WRONG\n");
+		exit();
+	}
+	else{
+		wait();
 	}
 
-	else	wait();
-
-	printf(1, "==========================================================================\n");
-
-	exit();	
+	exit();
 }

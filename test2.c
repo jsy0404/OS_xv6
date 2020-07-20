@@ -2,29 +2,29 @@
 #include "stat.h"
 #include "user.h"
 
-
-void test2(int n){
-	if(n > 0){
-		test2(n - 1);
-	}
-	if(n == 0)	printf(1, "PASSED!\n");
-
-	exit();
-}
-
-int main(int argc, char *argv[]){
+int
+main(int argc, char **argv)
+{
+	int before, after;
 	int pid;
 
-	printf(1, "[Test2, stack can grow for 1 page?]\n");
-
-	printf(1, "================================== Result=================================\n");
+	printf(1, "TEST2: ");
+	
+	before = freemem();
 
 	pid = fork();
-	
-	if(pid == 0)	test2(128);
-	else	wait();
+	if(pid == 0){
+		exit();
+	}
+	else{
+		wait();
+	}
 
-	printf(1, "==========================================================================\n");
+	after = freemem();
+	if(before == after)
+		printf(1, "OK\n");
+	else
+		printf(1, "WRONG\n");
 
-	exit();	
+	exit();
 }

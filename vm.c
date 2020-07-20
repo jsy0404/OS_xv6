@@ -9,7 +9,7 @@
 
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
-
+uint pflag;
 // Set up CPU's kernel segment descriptors.
 // Run once on entry on each CPU.
 void
@@ -32,7 +32,6 @@ seginit(void)
 // Return the address of the PTE in page table pgdir
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page table pages.
-
 static pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int alloc)
 {
@@ -53,39 +52,6 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
     *pde = V2P(pgtab) | PTE_P | PTE_W | PTE_U;
   }
   return &pgtab[PTX(va)];
-}
-//Allocation page which has only page entry withoud physical frame
-static int
-expand_stack(pde_t *pgdir, const void *va){
-    char *a = (char*)PGROUNDUP((uint)va);
-    char *mem;
-    pte_t *pte = walkpgdir(pgdir, a, 0);
-    if(pte == 0)
-        return -1;
-    mem = kalloc();
-    *pte =  V2P(mem)| PTE_W | PTE_U | PTE_P;
-    return 0;
-}
-// Allocation only page table entry without physical frame
-static int
-mymappages(pde_t *pgdir, void *va, uint size)
-{
-    char *a, *last;
-    pte_t *pte;
-
-    a = (char*)PGROUNDDOWN((uint)va);
-    last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
-    for(;;){
-        if((pte = walkpgdir(pgdir, a, 1)) == 0)
-            return -1;
-        if(*pte & PTE_P)
-            panic("remap");
-        if(a == last)
-            break;
-        a += PGSIZE;
-        *pte = 0x800;
-    }
-    return 0;
 }
 
 // Create PTEs for virtual addresses starting at va that refer to
@@ -168,6 +134,7 @@ setupkvm(void)
     }
   return pgdir;
 }
+
 // Allocate one page table for the machine for the kernel address
 // space for scheduler processes.
 void
@@ -247,22 +214,6 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
       return -1;
   }
   return 0;
-}
-
-int
-myallocuvm(pde_t *pgdir, uint oldsz, uint newsz){
-    uint a;
-    if(newsz >= KERNBASE)
-        return 0;
-    if(newsz < oldsz)
-        return oldsz;
-    a = PGROUNDUP(oldsz);
-    for(; a < newsz; a += PGSIZE)
-        mymappages(pgdir, (char*)a, PGSIZE);
-    expand_stack(pgdir, (void *)oldsz);
-    expand_stack(pgdir, (void *)(newsz-PGSIZE));
-    return newsz;
-
 }
 
 // Allocate page tables and physical memory to grow process from oldsz to
@@ -367,23 +318,21 @@ copyuvm(pde_t *pgdir, uint sz)
   pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
-  char *mem;
-
   if((d = setupkvm()) == 0)
     return 0;
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
-    if(!(*pte | PTE_YJSBIT))
+    if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
+    *pte &= ~PTE_W;
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
       goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
-      goto bad;
+    inc_refcounter(pa);
   }
+  lcr3(V2P(pgdir));
   return d;
 
 bad:
@@ -432,24 +381,38 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-void
-pagefault(void){
+void pagefault(){
     struct proc *curproc = myproc();
     pde_t *pgdir = curproc->pgdir;
-    uint err = (PGROUNDUP(rcr2())), sp = (PGROUNDUP(curproc->tf->esp)), sz = PGROUNDUP(curproc->sz);
-    if(err>sz || (sp != err) || (sz-err>3*PGSIZE)){
-        cprintf("[Pagefault]Invalid access!\n");
-        curproc->killed=1;
+    char * err = (char *)(PGROUNDDOWN((uint)rcr2())), *mem;
+    uint flags, count, pa;
+    pte_t *pte = walkpgdir(pgdir,(void *)err,0);
+    
+    if((uint)err>=KERNBASE || !(*pte & PTE_P)){
+        curproc->killed = 1;
         exit();
         return;
     }
-    cprintf("[Pagefault]Allocate new page!\n");
-    // Bottom page above the guard page reallocation
-    expand_stack(pgdir, (void *)(sp-PGSIZE));
-    //reload TLB
-    lcr3(V2P(pgdir));
-}
 
+    flags = PTE_FLAGS(*pte);
+    pa = PTE_ADDR(*pte);
+    count = get_refcounter(pa);
+    if(count>1){
+        if((mem = kalloc()) == 0){
+            cprintf("pagefault out of memory\n");
+            return;
+        }
+        memmove(mem, (char *)P2V(pa), PGSIZE);
+        *pte = V2P(mem) | PTE_W | flags;
+        dec_refcounter(pa);
+    }
+    else if(count==1)
+        *pte |= PTE_W;
+
+    lcr3(V2P(pgdir));
+    
+    
+}
 //PAGEBREAK!
 // Blank page.
 //PAGEBREAK!

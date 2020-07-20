@@ -2,28 +2,41 @@
 #include "stat.h"
 #include "user.h"
 
+int dump[10000000];
 
-void test4(int n){
-	if(n > 0){
-		test4(n - 1);
-	}
-	exit();
-}
-
-int main(int argc, char *argv[]){
+int
+main(int argc, char **argv)
+{
+	int i;
 	int pid;
+	int before, after;
 
-	printf(1, "[Test4, access guard page]\n");
+	printf(1, "TEST4: ");
 
-	printf(1, "================================== Result=================================\n");
+	for(i=0;i<10;i++){
+		before = freemem();
+		pid = fork();
+		if(pid == 0)
+			break;
+		after = freemem();
 
-	pid = fork();
-	
-	if(pid == 0)	test4(512);
-	else	wait();
+		if(before - after == 1){
+			printf(1, "WRONG\n");
+			exit();
+		}
+	}
 
-	printf(1, "==========================================================================\n");
+	if(pid > 0)
+		sleep(100);
 
+	if(pid == 0){
+		exit();
+	}
+	else{
+		for(i=0;i<10;i++)
+			wait();
+		printf(1, "OK\n");
+	}
 
-	exit();	
+	exit();
 }

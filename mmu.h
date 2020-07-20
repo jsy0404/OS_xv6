@@ -141,7 +141,6 @@ struct segdesc {
 #define PTE_D           0x040   // Dirty
 #define PTE_PS          0x080   // Page Size
 #define PTE_MBZ         0x180   // Bits must be zero
-#define PTE_YJSBIT      0x801   // 201424489_YJS Not on Physical Memory But in PTE for copyuvm panic "not present"
 
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)   ((uint)(pte) & ~0xFFF)

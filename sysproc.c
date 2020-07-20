@@ -91,31 +91,12 @@ sys_uptime(void)
 }
 
 int
-sys_yield(void)
+sys_halt(void)
 {
-  yield();
+  outw(0xB004, 0x0|0x2000);
   return 0;
 }
 
-int
-sys_setnice(void){
-    int pid, value;
-    if(argint(0, &pid)<0) return -1;
-    if(argint(1, &value)<0) return -1;
-    return setnice(pid, value);
-}
-
-int
-sys_getnice(void){
-    int pid;
-    if(argint(0, &pid)<0) return -1;
-    return getnice(pid);
-}
-
-int
-sys_ps(void){
-    int pid;
-    if(argint(0, &pid)<0) return -1;
-    ps(pid);
-    return 0;
+int sys_freemem(void){
+   return freemem();
 }

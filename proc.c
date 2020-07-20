@@ -6,7 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-
+ 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -19,16 +19,6 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
-
-static char *states[] = {
-    [UNUSED]    "unused",
-    [EMBRYO]    "embryo",
-    [SLEEPING]  "sleep ",
-    [RUNNABLE]  "runnable",
-    [RUNNING]   "run   ",
-    [ZOMBIE]    "zombie"
-};
-
 
 void
 pinit(void)
@@ -98,7 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->nice = 20;
+
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -134,6 +124,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
+  
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -207,7 +198,6 @@ fork(void)
   }
   np->sz = curproc->sz;
   np->parent = curproc;
-  np->nice = curproc->nice;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -332,49 +322,36 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p,*j,*idx, *pre;
+  struct proc *p;
   struct cpu *c = mycpu();
-  int mx;
   c->proc = 0;
+  
   for(;;){
     // Enable interrupts on this processor.
-    // Loop over process table looking for process to run.
     sti();
+
+    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    pre = idx = 0;
-    mx = 41;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
-          continue;
-      for(j = ptable.proc; j<&ptable.proc[NPROC]; j++)
-          if(j->state != RUNNABLE)
-              continue;
-          else if(j->nice < mx){
-              mx = j->nice;
-              idx = j;
-          }
-      if(pre == idx)
-          for(j = ++pre; j<&ptable.proc[NPROC]; j++)
-              if(j->nice == mx){
-                  idx = j;
-                  break;
-              }
-      if(idx->state != RUNNABLE)
-          break;
+        continue;
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = idx;
-      switchuvm(idx);
-      idx->state = RUNNING;
-      swtch(&(c->scheduler), idx->context);
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      swtch(&(c->scheduler), p->context);
       switchkvm();
+
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-      pre = idx;
     }
     release(&ptable.lock);
+
   }
 }
 
@@ -526,6 +503,14 @@ kill(int pid)
 void
 procdump(void)
 {
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
   int i;
   struct proc *p;
   char *state;
@@ -547,92 +532,3 @@ procdump(void)
     cprintf("\n");
   }
 }
-
-int
-setnice(int pid, int value){
-    struct proc *p;
-    acquire(&ptable.lock);
-    if(value<0 || value>40){
-        release(&ptable.lock);
-        cprintf("Nice value must be 0<=value<=40\n");
-        return -1;
-    }
-    for(p = ptable.proc; p<&ptable.proc[NPROC]; p++)
-        if(p->pid == pid){
-            p->nice = value;
-            release(&ptable.lock);
-            yield();
-            return 0;
-        }
-    release(&ptable.lock);
-    cprintf("No mathcing process for PID: %d\n", pid);
-    return -1;
-}
-
-int
-getnice(int pid){
-    struct proc *p;
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p<&ptable.proc[NPROC]; p++)
-        if(p->pid == pid){
-            if(p->nice <0 || p->nice>40){
-                release(&ptable.lock);
-                return -1;
-            }
-            else{
-                release(&ptable.lock);
-                return p->nice;
-            }
-        }
-    release(&ptable.lock);
-    cprintf("No matching process for PID: %d\n", pid);
-    return -1;
-}
-
-void insert_space(int sz, int init){
-    int i;
-    for(i=0; i<init+10-sz; ++i)
-        cprintf(" ");
-}//for adding more state
-
-int count_sz_int(int sz){
-    int i=0;
-    if(!sz)
-        return 1;
-    while(sz){
-        sz /= 10;
-        ++i;
-    }
-    return i;
-}//for adding more state
-
-int count_sz_str(char *s){
-    int i=0;
-    while(s[i] != '\0')
-        ++i;
-    return i;
-}//for adding more state
-
-void
-ps(int pid){
-    struct proc *p;
-    acquire(&ptable.lock);
-    cprintf("pid          ppid          prio          state          name\n");
-    for(p = ptable.proc; p<&ptable.proc[NPROC]; p++)
-        if((!pid && p->pid) ||(p->pid>0 && p->pid == pid)){
-            cprintf("%d", p->pid);
-            insert_space(count_sz_int(p->pid),3);
-            cprintf("%d", (p->parent != 0)*p->parent->pid);
-            insert_space(count_sz_int((p->parent != 0)*p->parent->pid),4);
-            cprintf("%d", p->nice);
-            insert_space(count_sz_int(p->nice),4);
-            cprintf("%s",states[p->state]);
-            insert_space(count_sz_str(states[p->state]),5);
-            cprintf("%s",p->name);
-            insert_space(count_sz_str(p->name),4);
-            cprintf("\n");
-        }
-    release(&ptable.lock);
-
-}
-

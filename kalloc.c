@@ -12,6 +12,7 @@
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
                    // defined by the kernel linker script in kernel.ld
+int numfreepages = 0;
 
 struct run {
   struct run *next;
@@ -69,6 +70,7 @@ kfree(char *v)
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
+  numfreepages++;
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
@@ -86,11 +88,16 @@ kalloc(void)
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
+  numfreepages--;
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
   if(kmem.use_lock)
     release(&kmem.lock);
   return (char*)r;
+}
+
+int freemem(){
+  return numfreepages;
 }
 
